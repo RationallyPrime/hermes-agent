@@ -144,31 +144,6 @@ PROVIDER_TO_MODELS_DEV: Dict[str, str] = {
     "anthropic": "anthropic",
     "openai": "openai",
     "openai-codex": "openai",
-    "zai": "zai",
-    "kimi-coding": "kimi-for-coding",
-    "kimi-coding-cn": "kimi-for-coding",
-    "minimax": "minimax",
-    "minimax-cn": "minimax-cn",
-    "deepseek": "deepseek",
-    "alibaba": "alibaba",
-    "qwen-oauth": "alibaba",
-    "copilot": "github-copilot",
-    "ai-gateway": "vercel",
-    "opencode-zen": "opencode",
-    "opencode-go": "opencode-go",
-    "kilocode": "kilo",
-    "fireworks": "fireworks-ai",
-    "huggingface": "huggingface",
-    "gemini": "google",
-    "google": "google",
-    "xai": "xai",
-    "xiaomi": "xiaomi",
-    "nvidia": "nvidia",
-    "groq": "groq",
-    "mistral": "mistral",
-    "togetherai": "togetherai",
-    "perplexity": "perplexity",
-    "cohere": "cohere",
 }
 
 # Reverse mapping: models.dev → Hermes (built lazily)
@@ -581,5 +556,4 @@ def get_model_info(
             return _parse_model_info(mid, mdata, mdev_id)
 
     return None
-
 

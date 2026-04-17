@@ -1112,16 +1112,8 @@ def select_provider_and_model(args=None):
     # Step 2: Provider-specific setup + model selection
     if selected_provider == "openrouter":
         _model_flow_openrouter(config, current_model)
-    elif selected_provider == "nous":
-        _model_flow_nous(config, current_model, args=args)
     elif selected_provider == "openai-codex":
         _model_flow_openai_codex(config, current_model)
-    elif selected_provider == "qwen-oauth":
-        _model_flow_qwen_oauth(config, current_model)
-    elif selected_provider == "copilot-acp":
-        _model_flow_copilot_acp(config, current_model)
-    elif selected_provider == "copilot":
-        _model_flow_copilot(config, current_model)
     elif selected_provider == "custom":
         _model_flow_custom(config)
     elif selected_provider.startswith("custom:") or selected_provider in _custom_provider_map:
@@ -1137,10 +1129,6 @@ def select_provider_and_model(args=None):
         _remove_custom_provider(config)
     elif selected_provider == "anthropic":
         _model_flow_anthropic(config, current_model)
-    elif selected_provider == "kimi-coding":
-        _model_flow_kimi(config, current_model)
-    elif selected_provider in ("gemini", "deepseek", "xai", "zai", "kimi-coding-cn", "minimax", "minimax-cn", "kilocode", "opencode-zen", "opencode-go", "ai-gateway", "alibaba", "huggingface", "xiaomi", "arcee"):
-        _model_flow_api_key_provider(config, selected_provider, current_model)
 
     # ── Post-switch cleanup: clear stale OPENAI_BASE_URL ──────────────
     # When the user switches to a named provider (anything except "custom"),
@@ -4574,7 +4562,7 @@ For more help on a command:
     )
     chat_parser.add_argument(
         "--provider",
-        choices=["auto", "openrouter", "nous", "openai-codex", "copilot-acp", "copilot", "anthropic", "gemini", "huggingface", "zai", "kimi-coding", "kimi-coding-cn", "minimax", "minimax-cn", "kilocode", "xiaomi", "arcee"],
+        choices=["auto", "openrouter", "openai-codex", "anthropic"],
         default=None,
         help="Inference provider (default: auto)"
     )
@@ -4789,9 +4777,9 @@ For more help on a command:
     )
     login_parser.add_argument(
         "--provider",
-        choices=["nous", "openai-codex"],
+        choices=["openai-codex"],
         default=None,
-        help="Provider to authenticate with (default: nous)"
+        help="Provider to authenticate with"
     )
     login_parser.add_argument(
         "--portal-url",
@@ -4843,7 +4831,7 @@ For more help on a command:
     )
     logout_parser.add_argument(
         "--provider",
-        choices=["nous", "openai-codex"],
+        choices=["openai-codex"],
         default=None,
         help="Provider to log out from (default: active provider)"
     )

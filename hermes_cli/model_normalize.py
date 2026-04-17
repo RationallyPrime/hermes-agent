@@ -2,18 +2,10 @@
 
 Different LLM providers expect model identifiers in different formats:
 
-- **Aggregators** (OpenRouter, Nous, AI Gateway, Kilo Code) need
-  ``vendor/model`` slugs like ``anthropic/claude-sonnet-4.6``.
+- **Aggregators** (OpenRouter) need ``vendor/model`` slugs like
+  ``anthropic/claude-sonnet-4.6``.
 - **Anthropic** native API expects bare names with dots replaced by
   hyphens: ``claude-sonnet-4-6``.
-- **Copilot** expects bare names *with* dots preserved:
-  ``claude-sonnet-4.6``.
-- **OpenCode Zen** preserves dots for GPT/GLM/Gemini/Kimi/MiniMax-style
-  model IDs, but Claude still uses hyphenated native names like
-  ``claude-sonnet-4-6``.
-- **OpenCode Go** preserves dots in model names: ``minimax-m2.7``.
-- **DeepSeek** only accepts two model identifiers:
-  ``deepseek-chat`` and ``deepseek-reasoner``.
 - **Custom** and remaining providers pass the name through as-is.
 
 This module centralises that translation so callers can simply write::
@@ -61,9 +53,6 @@ _VENDOR_PREFIXES: dict[str, str] = {
 # Providers whose APIs consume vendor/model slugs.
 _AGGREGATOR_PROVIDERS: frozenset[str] = frozenset({
     "openrouter",
-    "nous",
-    "ai-gateway",
-    "kilocode",
 })
 
 # Providers that want bare names with dots replaced by hyphens.
@@ -73,29 +62,16 @@ _DOT_TO_HYPHEN_PROVIDERS: frozenset[str] = frozenset({
 
 # Providers that want bare names with dots preserved.
 _STRIP_VENDOR_ONLY_PROVIDERS: frozenset[str] = frozenset({
-    "copilot",
-    "copilot-acp",
     "openai-codex",
 })
 
 # Providers whose native naming is authoritative -- pass through unchanged.
 _AUTHORITATIVE_NATIVE_PROVIDERS: frozenset[str] = frozenset({
-    "gemini",
-    "huggingface",
 })
 
 # Direct providers that accept bare native names but should repair a matching
 # provider/ prefix when users copy the aggregator form into config.yaml.
 _MATCHING_PREFIX_STRIP_PROVIDERS: frozenset[str] = frozenset({
-    "zai",
-    "kimi-coding",
-    "kimi-coding-cn",
-    "minimax",
-    "minimax-cn",
-    "alibaba",
-    "qwen-oauth",
-    "xiaomi",
-    "arcee",
     "custom",
 })
 
@@ -403,4 +379,3 @@ def normalize_model_for_provider(model_input: str, target_provider: str) -> str:
 # ---------------------------------------------------------------------------
 # Batch / convenience helpers
 # ---------------------------------------------------------------------------
-

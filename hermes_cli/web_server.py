@@ -838,28 +838,12 @@ _OAUTH_PROVIDER_CATALOG: tuple[Dict[str, Any], ...] = (
         "status_fn": _claude_code_only_status,
     },
     {
-        "id": "nous",
-        "name": "Nous Portal",
-        "flow": "device_code",
-        "cli_command": "hermes auth add nous",
-        "docs_url": "https://portal.nousresearch.com",
-        "status_fn": None,  # dispatched via auth.get_nous_auth_status
-    },
-    {
         "id": "openai-codex",
         "name": "OpenAI Codex (ChatGPT)",
         "flow": "device_code",
         "cli_command": "hermes auth add openai-codex",
         "docs_url": "https://platform.openai.com/docs",
         "status_fn": None,  # dispatched via auth.get_codex_auth_status
-    },
-    {
-        "id": "qwen-oauth",
-        "name": "Qwen (via Qwen CLI)",
-        "flow": "external",
-        "cli_command": "hermes auth add qwen-oauth",
-        "docs_url": "https://github.com/QwenLM/qwen-code",
-        "status_fn": None,  # dispatched via auth.get_qwen_auth_status
     },
 )
 
@@ -873,16 +857,6 @@ def _resolve_provider_status(provider_id: str, status_fn) -> Dict[str, Any]:
             return {"logged_in": False, "error": str(e)}
     try:
         from hermes_cli import auth as hauth
-        if provider_id == "nous":
-            raw = hauth.get_nous_auth_status()
-            return {
-                "logged_in": bool(raw.get("logged_in")),
-                "source": "nous_portal",
-                "source_label": raw.get("portal_base_url") or "Nous Portal",
-                "token_preview": _truncate_token(raw.get("access_token")),
-                "expires_at": raw.get("access_expires_at"),
-                "has_refresh_token": bool(raw.get("has_refresh_token")),
-            }
         if provider_id == "openai-codex":
             raw = hauth.get_codex_auth_status()
             return {
@@ -893,16 +867,6 @@ def _resolve_provider_status(provider_id: str, status_fn) -> Dict[str, Any]:
                 "expires_at": None,
                 "has_refresh_token": False,
                 "last_refresh": raw.get("last_refresh"),
-            }
-        if provider_id == "qwen-oauth":
-            raw = hauth.get_qwen_auth_status()
-            return {
-                "logged_in": bool(raw.get("logged_in")),
-                "source": "qwen_cli",
-                "source_label": raw.get("auth_store_path") or "Qwen CLI",
-                "token_preview": _truncate_token(raw.get("access_token")),
-                "expires_at": raw.get("expires_at"),
-                "has_refresh_token": bool(raw.get("has_refresh_token")),
             }
     except Exception as e:
         return {"logged_in": False, "error": str(e)}

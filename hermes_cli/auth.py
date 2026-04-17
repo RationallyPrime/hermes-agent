@@ -100,88 +100,11 @@ class ProviderConfig:
 
 
 PROVIDER_REGISTRY: Dict[str, ProviderConfig] = {
-    "nous": ProviderConfig(
-        id="nous",
-        name="Nous Portal",
-        auth_type="oauth_device_code",
-        portal_base_url=DEFAULT_NOUS_PORTAL_URL,
-        inference_base_url=DEFAULT_NOUS_INFERENCE_URL,
-        client_id=DEFAULT_NOUS_CLIENT_ID,
-        scope=DEFAULT_NOUS_SCOPE,
-    ),
     "openai-codex": ProviderConfig(
         id="openai-codex",
         name="OpenAI Codex",
         auth_type="oauth_external",
         inference_base_url=DEFAULT_CODEX_BASE_URL,
-    ),
-    "qwen-oauth": ProviderConfig(
-        id="qwen-oauth",
-        name="Qwen OAuth",
-        auth_type="oauth_external",
-        inference_base_url=DEFAULT_QWEN_BASE_URL,
-    ),
-    "copilot": ProviderConfig(
-        id="copilot",
-        name="GitHub Copilot",
-        auth_type="api_key",
-        inference_base_url=DEFAULT_GITHUB_MODELS_BASE_URL,
-        api_key_env_vars=("COPILOT_GITHUB_TOKEN", "GH_TOKEN", "GITHUB_TOKEN"),
-        base_url_env_var="COPILOT_API_BASE_URL",
-    ),
-    "copilot-acp": ProviderConfig(
-        id="copilot-acp",
-        name="GitHub Copilot ACP",
-        auth_type="external_process",
-        inference_base_url=DEFAULT_COPILOT_ACP_BASE_URL,
-        base_url_env_var="COPILOT_ACP_BASE_URL",
-    ),
-    "gemini": ProviderConfig(
-        id="gemini",
-        name="Google AI Studio",
-        auth_type="api_key",
-        inference_base_url="https://generativelanguage.googleapis.com/v1beta/openai",
-        api_key_env_vars=("GOOGLE_API_KEY", "GEMINI_API_KEY"),
-        base_url_env_var="GEMINI_BASE_URL",
-    ),
-    "zai": ProviderConfig(
-        id="zai",
-        name="Z.AI / GLM",
-        auth_type="api_key",
-        inference_base_url="https://api.z.ai/api/paas/v4",
-        api_key_env_vars=("GLM_API_KEY", "ZAI_API_KEY", "Z_AI_API_KEY"),
-        base_url_env_var="GLM_BASE_URL",
-    ),
-    "kimi-coding": ProviderConfig(
-        id="kimi-coding",
-        name="Kimi / Moonshot",
-        auth_type="api_key",
-        inference_base_url="https://api.moonshot.ai/v1",
-        api_key_env_vars=("KIMI_API_KEY",),
-        base_url_env_var="KIMI_BASE_URL",
-    ),
-    "kimi-coding-cn": ProviderConfig(
-        id="kimi-coding-cn",
-        name="Kimi / Moonshot (China)",
-        auth_type="api_key",
-        inference_base_url="https://api.moonshot.cn/v1",
-        api_key_env_vars=("KIMI_CN_API_KEY",),
-    ),
-    "arcee": ProviderConfig(
-        id="arcee",
-        name="Arcee AI",
-        auth_type="api_key",
-        inference_base_url="https://api.arcee.ai/api/v1",
-        api_key_env_vars=("ARCEEAI_API_KEY",),
-        base_url_env_var="ARCEE_BASE_URL",
-    ),
-    "minimax": ProviderConfig(
-        id="minimax",
-        name="MiniMax",
-        auth_type="api_key",
-        inference_base_url="https://api.minimax.io/anthropic",
-        api_key_env_vars=("MINIMAX_API_KEY",),
-        base_url_env_var="MINIMAX_BASE_URL",
     ),
     "anthropic": ProviderConfig(
         id="anthropic",
@@ -189,90 +112,6 @@ PROVIDER_REGISTRY: Dict[str, ProviderConfig] = {
         auth_type="api_key",
         inference_base_url="https://api.anthropic.com",
         api_key_env_vars=("ANTHROPIC_API_KEY", "ANTHROPIC_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN"),
-    ),
-    "alibaba": ProviderConfig(
-        id="alibaba",
-        name="Alibaba Cloud (DashScope)",
-        auth_type="api_key",
-        inference_base_url="https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
-        api_key_env_vars=("DASHSCOPE_API_KEY",),
-        base_url_env_var="DASHSCOPE_BASE_URL",
-    ),
-    "minimax-cn": ProviderConfig(
-        id="minimax-cn",
-        name="MiniMax (China)",
-        auth_type="api_key",
-        inference_base_url="https://api.minimaxi.com/anthropic",
-        api_key_env_vars=("MINIMAX_CN_API_KEY",),
-        base_url_env_var="MINIMAX_CN_BASE_URL",
-    ),
-    "deepseek": ProviderConfig(
-        id="deepseek",
-        name="DeepSeek",
-        auth_type="api_key",
-        inference_base_url="https://api.deepseek.com/v1",
-        api_key_env_vars=("DEEPSEEK_API_KEY",),
-        base_url_env_var="DEEPSEEK_BASE_URL",
-    ),
-    "xai": ProviderConfig(
-        id="xai",
-        name="xAI",
-        auth_type="api_key",
-        inference_base_url="https://api.x.ai/v1",
-        api_key_env_vars=("XAI_API_KEY",),
-        base_url_env_var="XAI_BASE_URL",
-    ),
-    "ai-gateway": ProviderConfig(
-        id="ai-gateway",
-        name="Vercel AI Gateway",
-        auth_type="api_key",
-        inference_base_url="https://ai-gateway.vercel.sh/v1",
-        api_key_env_vars=("AI_GATEWAY_API_KEY",),
-        base_url_env_var="AI_GATEWAY_BASE_URL",
-    ),
-    "opencode-zen": ProviderConfig(
-        id="opencode-zen",
-        name="OpenCode Zen",
-        auth_type="api_key",
-        inference_base_url="https://opencode.ai/zen/v1",
-        api_key_env_vars=("OPENCODE_ZEN_API_KEY",),
-        base_url_env_var="OPENCODE_ZEN_BASE_URL",
-    ),
-    "opencode-go": ProviderConfig(
-        id="opencode-go",
-        name="OpenCode Go",
-        auth_type="api_key",
-        # OpenCode Go mixes API surfaces by model:
-        # - GLM / Kimi use OpenAI-compatible chat completions under /v1
-        # - MiniMax models use Anthropic Messages under /v1/messages
-        # Keep the provider base at /v1 and select api_mode per-model.
-        inference_base_url="https://opencode.ai/zen/go/v1",
-        api_key_env_vars=("OPENCODE_GO_API_KEY",),
-        base_url_env_var="OPENCODE_GO_BASE_URL",
-    ),
-    "kilocode": ProviderConfig(
-        id="kilocode",
-        name="Kilo Code",
-        auth_type="api_key",
-        inference_base_url="https://api.kilo.ai/api/gateway",
-        api_key_env_vars=("KILOCODE_API_KEY",),
-        base_url_env_var="KILOCODE_BASE_URL",
-    ),
-    "huggingface": ProviderConfig(
-        id="huggingface",
-        name="Hugging Face",
-        auth_type="api_key",
-        inference_base_url="https://router.huggingface.co/v1",
-        api_key_env_vars=("HF_TOKEN",),
-        base_url_env_var="HF_BASE_URL",
-    ),
-    "xiaomi": ProviderConfig(
-        id="xiaomi",
-        name="Xiaomi MiMo",
-        auth_type="api_key",
-        inference_base_url="https://api.xiaomimimo.com/v1",
-        api_key_env_vars=("XIAOMI_API_KEY",),
-        base_url_env_var="XIAOMI_BASE_URL",
     ),
 }
 
@@ -897,30 +736,15 @@ def resolve_provider(
     1. active_provider in auth.json with valid credentials
     2. Explicit CLI api_key/base_url -> "openrouter"
     3. OPENAI_API_KEY or OPENROUTER_API_KEY env vars -> "openrouter"
-    4. Provider-specific API keys (GLM, Kimi, MiniMax) -> that provider
+    4. Provider-specific API keys (Anthropic) -> that provider
     5. Fallback: "openrouter"
     """
     normalized = (requested or "auto").strip().lower()
 
     # Normalize provider aliases
     _PROVIDER_ALIASES = {
-        "glm": "zai", "z-ai": "zai", "z.ai": "zai", "zhipu": "zai",
-        "google": "gemini", "google-gemini": "gemini", "google-ai-studio": "gemini",
-        "kimi": "kimi-coding", "kimi-for-coding": "kimi-coding", "moonshot": "kimi-coding",
-        "kimi-cn": "kimi-coding-cn", "moonshot-cn": "kimi-coding-cn",
-        "arcee-ai": "arcee", "arceeai": "arcee",
-        "minimax-china": "minimax-cn", "minimax_cn": "minimax-cn",
+        "openai": "openrouter",
         "claude": "anthropic", "claude-code": "anthropic",
-        "github": "copilot", "github-copilot": "copilot",
-        "github-models": "copilot", "github-model": "copilot",
-        "github-copilot-acp": "copilot-acp", "copilot-acp-agent": "copilot-acp",
-        "aigateway": "ai-gateway", "vercel": "ai-gateway", "vercel-ai-gateway": "ai-gateway",
-        "opencode": "opencode-zen", "zen": "opencode-zen",
-        "qwen-portal": "qwen-oauth", "qwen-cli": "qwen-oauth", "qwen-oauth": "qwen-oauth",
-        "hf": "huggingface", "hugging-face": "huggingface", "huggingface-hub": "huggingface",
-        "mimo": "xiaomi", "xiaomi-mimo": "xiaomi",
-        "go": "opencode-go", "opencode-go-sub": "opencode-go",
-        "kilo": "kilocode", "kilo-code": "kilocode", "kilo-gateway": "kilocode",
         # Local server aliases — route through the generic custom provider
         "lmstudio": "custom", "lm-studio": "custom", "lm_studio": "custom",
         "ollama": "custom", "vllm": "custom", "llamacpp": "custom",
