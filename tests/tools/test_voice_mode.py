@@ -414,6 +414,38 @@ class TestAudioRecorder:
 
         assert mock_sd.InputStream.call_count == 1
 
+    def test_idle_voice_activity_fires_once_until_rearmed(self, mock_sd):
+        np = pytest.importorskip("numpy")
+        import threading
+
+        mock_stream = MagicMock()
+        mock_sd.InputStream.return_value = mock_stream
+
+        from tools.voice_mode import AudioRecorder
+
+        recorder = AudioRecorder()
+        fired = threading.Event()
+        recorder.set_voice_activity_callback(fired.set, threshold=200, duration=0.05)
+
+        callback = mock_sd.InputStream.call_args.kwargs["callback"]
+        loud = np.full((1600, 1), 1000, dtype="int16")
+
+        callback(loud, len(loud), None, None)
+        time.sleep(0.06)
+        callback(loud, len(loud), None, None)
+
+        assert fired.wait(1.0)
+        fired.clear()
+        time.sleep(0.06)
+        callback(loud, len(loud), None, None)
+        assert not fired.wait(0.1)
+
+        recorder.rearm_voice_activity()
+        callback(loud, len(loud), None, None)
+        time.sleep(0.06)
+        callback(loud, len(loud), None, None)
+        assert fired.wait(1.0)
+
 
 class TestAudioRecorderStop:
     def test_stop_returns_none_when_not_recording(self):

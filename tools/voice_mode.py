@@ -413,6 +413,12 @@ class AudioRecorder:
         self._peak_rms: int = 0
         # Live audio level (read by UI for visual feedback)
         self._current_rms: int = 0
+        # Optional idle voice-activity callback used by CLI auto-listen.
+        self._voice_activity_callback = None
+        self._voice_activity_threshold: int = SILENCE_RMS_THRESHOLD
+        self._voice_activity_duration: float = 0.35
+        self._voice_activity_start: float = 0.0
+        self._voice_activity_armed: bool = True
 
     # -- public properties ---------------------------------------------------
 
@@ -434,6 +440,35 @@ class AudioRecorder:
 
     # -- public methods ------------------------------------------------------
 
+    def set_voice_activity_callback(
+        self,
+        callback=None,
+        *,
+        threshold: Optional[int] = None,
+        duration: float = 0.35,
+    ) -> None:
+        """Configure idle voice-activity detection for auto-listen.
+
+        The persistent input stream remains open while voice mode is enabled.
+        When not actively recording, sustained audio above ``threshold`` invokes
+        ``callback`` once and disarms until ``rearm_voice_activity()`` is called.
+        """
+        with self._lock:
+            self._voice_activity_callback = callback
+            if threshold is not None:
+                self._voice_activity_threshold = int(threshold)
+            self._voice_activity_duration = max(0.05, float(duration))
+            self._voice_activity_start = 0.0
+            self._voice_activity_armed = callback is not None
+        if callback is not None:
+            self._ensure_stream()
+
+    def rearm_voice_activity(self) -> None:
+        """Allow the idle voice-activity callback to fire again."""
+        with self._lock:
+            self._voice_activity_start = 0.0
+            self._voice_activity_armed = self._voice_activity_callback is not None
+
     def _ensure_stream(self) -> None:
         """Create the audio InputStream once and keep it alive.
 
@@ -450,14 +485,35 @@ class AudioRecorder:
         def _callback(indata, frames, time_info, status):  # noqa: ARG001
             if status:
                 logger.debug("sounddevice status: %s", status)
-            # When not recording the stream is idle — discard audio.
-            if not self._recording:
-                return
-            self._frames.append(indata.copy())
-
             # Compute RMS for level display and silence detection
             rms = int(np.sqrt(np.mean(indata.astype(np.float64) ** 2)))
             self._current_rms = rms
+
+            # When not recording, the persistent stream can still act as a
+            # lightweight VAD trigger for CLI auto-listen. Fire only after
+            # sustained above-threshold audio, then disarm until re-armed by
+            # the CLI after recording/transcription finishes.
+            if not self._recording:
+                cb = self._voice_activity_callback
+                if cb is not None and self._voice_activity_armed:
+                    now = time.monotonic()
+                    if rms > self._voice_activity_threshold:
+                        if self._voice_activity_start == 0.0:
+                            self._voice_activity_start = now
+                        elif now - self._voice_activity_start >= self._voice_activity_duration:
+                            self._voice_activity_armed = False
+                            self._voice_activity_start = 0.0
+                            def _safe_voice_activity_cb():
+                                try:
+                                    cb()
+                                except Exception as e:
+                                    logger.error("Voice activity callback failed: %s", e, exc_info=True)
+                            threading.Thread(target=_safe_voice_activity_cb, daemon=True).start()
+                    else:
+                        self._voice_activity_start = 0.0
+                return
+            self._frames.append(indata.copy())
+
             self._peak_rms = max(self._peak_rms, rms)
 
             # Silence detection
@@ -695,6 +751,9 @@ class AudioRecorder:
             self._recording = False
             self._frames = []
             self._on_silence_stop = None
+            self._voice_activity_callback = None
+            self._voice_activity_start = 0.0
+            self._voice_activity_armed = False
         # Close stream OUTSIDE the lock to avoid deadlock with audio callback
         self._close_stream_with_timeout()
         logger.info("AudioRecorder shut down")

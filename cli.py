@@ -10073,15 +10073,58 @@ class HermesCLI:
 
             text_to_speech_tool(text=tts_text, output_path=mp3_path)
 
-            # Play the MP3 directly (the TTS tool returns OGG path but MP3 still exists)
+            # Prefer the Reachy speaker when the body bridge is healthy; otherwise
+            # fall back to local laptop playback. The bridge accepts WAV, so convert
+            # the generated MP3 with ffmpeg when available.
             if os.path.isfile(mp3_path) and os.path.getsize(mp3_path) > 0:
-                play_audio_file(mp3_path)
+                played_via_reachy = False
+                wav_path = mp3_path.rsplit(".", 1)[0] + ".wav"
+                try:
+                    import json as _json
+                    import subprocess as _subprocess
+                    import urllib.error as _urlerror
+                    import urllib.request as _urlrequest
+
+                    base_url = (os.getenv("REACHY_BODY_URL") or "http://reachy-mini.local:8008").rstrip("/")
+                    try:
+                        with _urlrequest.urlopen(base_url + "/health", timeout=1.5) as _resp:
+                            health = _json.loads(_resp.read().decode("utf-8", errors="replace") or "{}")
+                    except (_urlerror.URLError, OSError, ValueError, _json.JSONDecodeError):
+                        health = {}
+
+                    if health.get("ok") and health.get("connected") and not health.get("dry_run"):
+                        converted = _subprocess.run(
+                            ["ffmpeg", "-y", "-loglevel", "error", "-i", mp3_path, "-ac", "1", "-ar", "22050", "-sample_fmt", "s16", wav_path],
+                            stdout=_subprocess.DEVNULL,
+                            stderr=_subprocess.DEVNULL,
+                            timeout=20,
+                            check=False,
+                        )
+                        if converted.returncode == 0 and os.path.isfile(wav_path) and os.path.getsize(wav_path) > 0:
+                            with open(wav_path, "rb") as _wav:
+                                req = _urlrequest.Request(
+                                    base_url + "/audio/wav?wait=true",
+                                    data=_wav.read(),
+                                    headers={"Content-Type": "audio/wav", "Accept": "application/json"},
+                                    method="POST",
+                                )
+                            with _urlrequest.urlopen(req, timeout=30) as _resp:
+                                result = _json.loads(_resp.read().decode("utf-8", errors="replace") or "{}")
+                            played_via_reachy = bool(result.get("ok"))
+                except Exception as exc:
+                    logger.debug("Reachy TTS playback unavailable, falling back locally: %s", exc)
+
+                if not played_via_reachy:
+                    play_audio_file(mp3_path)
+
                 # Clean up
                 try:
                     os.unlink(mp3_path)
                     ogg_path = mp3_path.rsplit(".", 1)[0] + ".ogg"
                     if os.path.isfile(ogg_path):
                         os.unlink(ogg_path)
+                    if os.path.isfile(wav_path):
+                        os.unlink(wav_path)
                 except OSError:
                     pass
         except Exception as e:
@@ -10112,6 +10155,72 @@ class HermesCLI:
         else:
             _cprint(f"Unknown voice subcommand: {subcommand}")
             _cprint("Usage: /voice [on|off|tts|status]")
+
+    def _configure_voice_auto_listen(self, voice_config: dict | None = None) -> None:
+        """Arm idle VAD so speaking starts CLI voice recording automatically."""
+        if voice_config is None:
+            voice_config = {}
+        if self._voice_recorder is None:
+            from tools.voice_mode import create_audio_recorder
+            self._voice_recorder = create_audio_recorder()
+
+        if not hasattr(self._voice_recorder, "set_voice_activity_callback"):
+            _cprint(f"{_DIM}Voice auto-listen is not available for this audio backend.{_RST}")
+            return
+
+        threshold = voice_config.get("auto_listen_threshold", voice_config.get("silence_threshold", 200))
+        if not isinstance(threshold, (int, float)) or isinstance(threshold, bool):
+            threshold = 200
+        duration = voice_config.get("auto_listen_duration", 0.35)
+        if not isinstance(duration, (int, float)) or isinstance(duration, bool):
+            duration = 0.35
+
+        def _on_voice_activity():
+            with self._voice_lock:
+                blocked = (
+                    not self._voice_mode
+                    or not self._voice_auto_listen
+                    or self._voice_recording
+                    or self._voice_processing
+                    or self._agent_running
+                )
+            if blocked or not self._voice_tts_done.is_set():
+                self._rearm_voice_auto_listen(delay=0.5)
+                return
+            if self._clarify_state or self._sudo_state or self._approval_state or self._slash_confirm_state:
+                self._rearm_voice_auto_listen(delay=0.5)
+                return
+            with self._voice_lock:
+                self._voice_continuous = False
+            try:
+                self._voice_start_recording()
+                if hasattr(self, '_app') and self._app:
+                    self._app.invalidate()
+            except Exception as e:
+                _cprint(f"\n{_DIM}Voice auto-listen failed: {e}{_RST}")
+                self._rearm_voice_auto_listen(delay=1.0)
+
+        with self._voice_lock:
+            self._voice_auto_listen = True
+        self._voice_recorder.set_voice_activity_callback(  # type: ignore[attr-defined]
+            _on_voice_activity,
+            threshold=int(threshold),
+            duration=float(duration),
+        )
+
+    def _rearm_voice_auto_listen(self, delay: float = 0.0) -> None:
+        """Re-arm idle VAD after TTS/agent/recording activity settles."""
+        def _do_rearm():
+            if delay > 0:
+                time.sleep(delay)
+            try:
+                with self._voice_lock:
+                    enabled = self._voice_mode and self._voice_auto_listen and not self._voice_recording
+                if enabled and self._voice_recorder is not None and hasattr(self._voice_recorder, "rearm_voice_activity"):
+                    self._voice_recorder.rearm_voice_activity()  # type: ignore[attr-defined]
+            except Exception:
+                pass
+        threading.Thread(target=_do_rearm, daemon=True).start()
 
     def _voice_beeps_enabled(self) -> bool:
         """Return whether CLI voice mode should play record start/stop beeps."""
@@ -10166,6 +10275,8 @@ class HermesCLI:
             if voice_config.get("auto_tts", False):
                 with self._voice_lock:
                     self._voice_tts = True
+            if voice_config.get("auto_listen", False):
+                self._configure_voice_auto_listen(voice_config)
         except Exception:
             pass
 
@@ -10195,6 +10306,7 @@ class HermesCLI:
             self._voice_mode = False
             self._voice_tts = False
             self._voice_continuous = False
+            self._voice_auto_listen = False
 
         # Shut down the persistent audio stream in background
         if recorder is not None:
@@ -10242,6 +10354,7 @@ class HermesCLI:
         _cprint(f"\n{_BOLD}Voice Mode Status{_RST}")
         _cprint(f"  Mode:      {'ON' if self._voice_mode else 'OFF'}")
         _cprint(f"  TTS:       {'ON' if self._voice_tts else 'OFF'}")
+        _cprint(f"  Auto-listen: {'ON' if self._voice_auto_listen else 'OFF'}")
         _cprint(f"  Recording: {'YES' if self._voice_recording else 'no'}")
         # Display the startup-pinned label so /voice status always
         # matches the live prompt_toolkit binding (Copilot round-14 on
@@ -11731,6 +11844,7 @@ class HermesCLI:
         self._voice_recording = False   # Whether currently recording
         self._voice_processing = False  # Whether STT is in progress
         self._voice_continuous = False  # Whether to auto-restart after agent responds
+        self._voice_auto_listen = False  # Whether speech automatically starts recording
         self._voice_tts_done = threading.Event()  # Signals TTS playback finished
         self._voice_tts_done.set()  # Initially "done" (no TTS pending)
 
@@ -13603,6 +13717,11 @@ class HermesCLI:
                                 except Exception as e:
                                     _cprint(f"{_DIM}Voice auto-restart failed: {e}{_RST}")
                             threading.Thread(target=_restart_recording, daemon=True).start()
+                        elif self._voice_mode and self._voice_auto_listen and not self._voice_recording:
+                            if self._voice_tts:
+                                self._voice_tts_done.wait(timeout=60)
+                                time.sleep(0.3)
+                            self._rearm_voice_auto_listen(delay=0.2)
 
                         # Drain process notifications (completions + watch matches)
                         # that arrived while the agent was running.
