@@ -20,6 +20,8 @@ import tempfile
 import threading
 import time
 import wave
+import urllib.error
+import urllib.request
 from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
@@ -900,6 +902,101 @@ def stop_playback() -> None:
         pass
 
 
+def _reachy_body_base_url() -> Optional[str]:
+    """Return the Reachy body bridge URL when robot audio should be tried."""
+    if os.getenv("HERMES_DISABLE_REACHY_AUDIO"):
+        return None
+    if os.getenv("PYTEST_CURRENT_TEST"):
+        return None
+    configured = os.getenv("REACHY_BODY_URL")
+    if configured:
+        return configured.rstrip("/")
+    # The Reachy body bridge defaults to mDNS on macOS; avoid probing it on
+    # headless Linux CI where DNS timeouts would slow every playback attempt.
+    if platform.system() == "Darwin":
+        return "http://reachy-mini.local:8008"
+    return None
+
+
+def _reachy_body_bridge_available(timeout: float = 0.35) -> bool:
+    """Return True when the Reachy bridge is healthy, connected, and live."""
+    base_url = _reachy_body_base_url()
+    if not base_url:
+        return False
+    try:
+        with urllib.request.urlopen(base_url + "/health", timeout=timeout) as resp:
+            import json
+            data = json.loads(resp.read().decode("utf-8"))
+        return bool(data.get("ok") and data.get("connected") and not data.get("dry_run"))
+    except Exception as exc:
+        logger.debug("Reachy body bridge unavailable: %s", exc)
+        return False
+
+
+def _convert_to_reachy_wav(file_path: str) -> Optional[str]:
+    """Return a WAV path suitable for Reachy, converting with ffmpeg if needed."""
+    if file_path.lower().endswith(".wav"):
+        return file_path
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg:
+        logger.debug("ffmpeg not available; cannot convert %s for Reachy", file_path)
+        return None
+    fd, wav_path = tempfile.mkstemp(suffix=".wav", prefix="hermes_reachy_")
+    os.close(fd)
+    try:
+        result = subprocess.run(
+            [ffmpeg, "-y", "-loglevel", "error", "-i", file_path, "-ac", "1", "-ar", "22050", "-sample_fmt", "s16", wav_path],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=30,
+            check=False,
+        )
+        if result.returncode == 0 and os.path.isfile(wav_path) and os.path.getsize(wav_path) > 0:
+            return wav_path
+    except Exception as exc:
+        logger.debug("Reachy WAV conversion failed: %s", exc)
+    try:
+        os.unlink(wav_path)
+    except OSError:
+        pass
+    return None
+
+
+def _play_audio_file_via_reachy(file_path: str) -> bool:
+    """Play an audio file through the Reachy body bridge when available."""
+    base_url = _reachy_body_base_url()
+    if not base_url or not _reachy_body_bridge_available():
+        return False
+    wav_path = _convert_to_reachy_wav(file_path)
+    if not wav_path:
+        return False
+    converted = wav_path != file_path
+    try:
+        with open(wav_path, "rb") as wav_file:
+            req = urllib.request.Request(
+                base_url + "/audio/wav?wait=true",
+                data=wav_file.read(),
+                headers={"Content-Type": "audio/wav", "Accept": "application/json"},
+                method="POST",
+            )
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            import json
+            data = json.loads(resp.read().decode("utf-8"))
+        ok = bool(data.get("ok"))
+        if ok:
+            logger.info("Played audio through Reachy body bridge: %s", file_path)
+        return ok
+    except Exception as exc:
+        logger.debug("Reachy audio playback failed: %s", exc)
+        return False
+    finally:
+        if converted:
+            try:
+                os.unlink(wav_path)
+            except OSError:
+                pass
+
+
 def play_audio_file(file_path: str) -> bool:
     """Play an audio file through the default output device.
 
@@ -918,6 +1015,12 @@ def play_audio_file(file_path: str) -> bool:
     if not os.path.isfile(file_path):
         logger.warning("Audio file not found: %s", file_path)
         return False
+
+    # Prefer the Reachy body bridge when available. This keeps robot playback
+    # centralized in the shared audio layer so batch TTS, streaming TTS
+    # fallbacks, and any other CLI audio call all use the same output boundary.
+    if _play_audio_file_via_reachy(file_path):
+        return True
 
     # Try sounddevice for WAV files
     if file_path.endswith(".wav"):

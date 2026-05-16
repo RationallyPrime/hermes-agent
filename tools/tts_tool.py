@@ -2057,15 +2057,21 @@ def stream_tts_to_speaker(
                 logger.warning("elevenlabs package not installed; streaming TTS disabled")
 
             # Open a single sounddevice output stream for the lifetime of
-            # this function.  ElevenLabs pcm_24000 produces signed 16-bit
-            # little-endian mono PCM at 24 kHz.
+            # this function unless robot audio is available. When Reachy is
+            # connected, leave ``output_stream`` unset so the existing temp-WAV
+            # fallback goes through tools.voice_mode.play_audio_file(), which
+            # owns the shared output-device routing.
             if client is not None:
                 try:
-                    sd = _import_sounddevice()
-                    output_stream = sd.OutputStream(
-                        samplerate=24000, channels=1, dtype="int16",
-                    )
-                    output_stream.start()
+                    from tools.voice_mode import _reachy_body_bridge_available
+                    if _reachy_body_bridge_available():
+                        logger.debug("Reachy audio available; routing streaming TTS via shared playback")
+                    else:
+                        sd = _import_sounddevice()
+                        output_stream = sd.OutputStream(
+                            samplerate=24000, channels=1, dtype="int16",
+                        )
+                        output_stream.start()
                 except (ImportError, OSError) as exc:
                     logger.debug("sounddevice not available: %s", exc)
                     output_stream = None

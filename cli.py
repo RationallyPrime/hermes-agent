@@ -10073,49 +10073,10 @@ class HermesCLI:
 
             text_to_speech_tool(text=tts_text, output_path=mp3_path)
 
-            # Prefer the Reachy speaker when the body bridge is healthy; otherwise
-            # fall back to local laptop playback. The bridge accepts WAV, so convert
-            # the generated MP3 with ffmpeg when available.
+            # Shared playback owns the output boundary: Reachy body bridge
+            # first when available, local system audio as fallback.
             if os.path.isfile(mp3_path) and os.path.getsize(mp3_path) > 0:
-                played_via_reachy = False
-                wav_path = mp3_path.rsplit(".", 1)[0] + ".wav"
-                try:
-                    import json as _json
-                    import subprocess as _subprocess
-                    import urllib.error as _urlerror
-                    import urllib.request as _urlrequest
-
-                    base_url = (os.getenv("REACHY_BODY_URL") or "http://reachy-mini.local:8008").rstrip("/")
-                    try:
-                        with _urlrequest.urlopen(base_url + "/health", timeout=1.5) as _resp:
-                            health = _json.loads(_resp.read().decode("utf-8", errors="replace") or "{}")
-                    except (_urlerror.URLError, OSError, ValueError, _json.JSONDecodeError):
-                        health = {}
-
-                    if health.get("ok") and health.get("connected") and not health.get("dry_run"):
-                        converted = _subprocess.run(
-                            ["ffmpeg", "-y", "-loglevel", "error", "-i", mp3_path, "-ac", "1", "-ar", "22050", "-sample_fmt", "s16", wav_path],
-                            stdout=_subprocess.DEVNULL,
-                            stderr=_subprocess.DEVNULL,
-                            timeout=20,
-                            check=False,
-                        )
-                        if converted.returncode == 0 and os.path.isfile(wav_path) and os.path.getsize(wav_path) > 0:
-                            with open(wav_path, "rb") as _wav:
-                                req = _urlrequest.Request(
-                                    base_url + "/audio/wav?wait=true",
-                                    data=_wav.read(),
-                                    headers={"Content-Type": "audio/wav", "Accept": "application/json"},
-                                    method="POST",
-                                )
-                            with _urlrequest.urlopen(req, timeout=30) as _resp:
-                                result = _json.loads(_resp.read().decode("utf-8", errors="replace") or "{}")
-                            played_via_reachy = bool(result.get("ok"))
-                except Exception as exc:
-                    logger.debug("Reachy TTS playback unavailable, falling back locally: %s", exc)
-
-                if not played_via_reachy:
-                    play_audio_file(mp3_path)
+                play_audio_file(mp3_path)
 
                 # Clean up
                 try:
@@ -10123,8 +10084,6 @@ class HermesCLI:
                     ogg_path = mp3_path.rsplit(".", 1)[0] + ".ogg"
                     if os.path.isfile(ogg_path):
                         os.unlink(ogg_path)
-                    if os.path.isfile(wav_path):
-                        os.unlink(wav_path)
                 except OSError:
                     pass
         except Exception as e:
